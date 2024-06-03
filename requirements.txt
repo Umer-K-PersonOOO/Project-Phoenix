@@ -1,0 +1,9 @@
+langchain
+transformers
+torch
+flask
+chromadb
+gradio
+ollama
+langchain-community
+beautifulsoup4
