@@ -1,9 +1,7 @@
+google-generativeai
+python-dotenv
+langchain-google-genai
 langchain
-transformers
-torch
-flask
+langchain_community
+pypdf2
 chromadb
-gradio
-ollama
-langchain-community
-beautifulsoup4

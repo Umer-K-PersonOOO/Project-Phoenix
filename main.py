@@ -1,51 +1,52 @@
-import ollama
-from flask import Flask, request, jsonify, render_template, Response
-import time
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain.prompts import PromptTemplate
+from langchain_community.document_loaders import PyPDFLoader
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain.chains.retrieval import create_retrieval_chain
+from langchain_community.vectorstores import Chroma
+from dotenv import load_dotenv
+import os
 
-app = Flask(__name__, static_folder='static', template_folder='templates')
+load_dotenv()
 
-roles = {
-    "waiter": "You are a waiter in a Spanish restaurant. Greet the customer and take their order.",
-    "tour_guide": "You are a tour guide in Madrid. Describe the historical significance of Plaza Mayor.",
-    "sports_fan": "You are a fan at a football game. Discuss the match with another fan."
-}
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
-def generate_role_play_stream(role, user_input, language):
-    scenario = roles.get(role, "You are a conversational partner.")
-    prompt = f"{scenario}\nUser: {user_input}\nAI (respond in {language}):"
-    response = ollama.chat(
-        model='llama3',  # Replace with the actual model name provided by Ollama
-        messages=[{'role': 'user', 'content': prompt}]
-    )
-    if 'message' in response and 'content' in response['message']:
-        content = response['message']['content']
-        for char in content:
-            yield f"data: {char}\n\n"
-            time.sleep(0.05)  # Simulate delay
-    else:
-        yield "data: Error: 'message' or 'content' key not found in the response\n\n"
+# Initialize the Google Generative AI model
+llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=GEMINI_API_KEY)
 
-@app.route('/')
-def index():
-    return render_template('index.html')
+# Define your custom prompt template
+prompt_template = PromptTemplate(
+    input_variables=["history", "question"],
+    template="""
+    {history}
+    In this chat, you are a waiter in a Mexican restaurant. You can only speak Spanish and under no circumstances can you speak English. No emojis are allowed.
+    If the customer talks about something unrelated to a restaurant conversation, respond with only "Huh?"
+    Customer: {question}
+    """
+)
 
-@app.route('/chat', methods=['POST'])
-def chat():
-    if request.is_json:
-        data = request.get_json()
-        role = data.get('role')
-        user_input = data.get('input')
-        language = data.get('language', 'Spanish')  # Default to Spanish if not specified
-        return Response(generate_role_play_stream(role, user_input, language), content_type='text/event-stream')
-    else:
-        return jsonify({"error": "Request must be JSON"}), 415
+# Function to run the conversation
+def run_conversation():
+    history = ""
+    while True:
+        question = input('You: ')
+        if question.strip() == '\\end':
+            print('Gemini: Goodbye!')
+            break
+        
+        # Create the full prompt with history and current question
+        prompt = prompt_template.format(history=history, question=question)
+        
+        # Get the response from the model
+        response = llm.invoke(prompt)
+        
+        # Print the response
+        print('\n')
+        print('Gemini:', response.content)
+        print('\n')
+        
+        # Update history
+        history += f"Customer: {question}\nWaiter: {response.content}\n"
 
-@app.route('/chat-stream')
-def chat_stream():
-    role = request.args.get('role')
-    user_input = request.args.get('input')
-    language = request.args.get('language', 'Spanish')  # Default to Spanish if not specified
-    return Response(generate_role_play_stream(role, user_input, language), content_type='text/event-stream')
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+run_conversation()
