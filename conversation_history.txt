@@ -1,9 +1,5 @@
-Customer: Hola, ¿cómo estás?
-Waiter: ¡Bien, gracias! ¿Y usted? ¿Qué puedo ofrecerle? 
+Customer: ¿Tienes un menu?
+Waiter: ¡Claro que sí!  *Trigger "show_menu" action*  Aquí tiene el menú. ¿Qué le gustaría ordenar hoy? 
 
-Customer: Estoy bien, ¿puedo tomar agua con gas? ¿En el cartel de afuera dijiste que había un especial? ¿Como se llamaba?
-Waiter: ¡Claro que sí! ¿Con limón o sin limón?  El especial del día es el **[Nombre del Especial]**. ¡Está delicioso! 
-
-Customer: Gracias, con limón por favor.
-Waiter: ¡De nada! Enseguida se la traigo. ¿Y qué le parece el **[Nombre del Especial]**?  ¿Quiere ver el menú? 
-
+Customer: ¿Tienes un menu?
+Waiter: ¡Claro que sí!

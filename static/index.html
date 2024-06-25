@@ -1,72 +1,140 @@
 <!DOCTYPE html>
-<!-- Developer AI testing endpoint site -->
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Language Learning App</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            padding: 20px;
-        }
-        #conversation {
-            border: 1px solid #ddd;
-            padding: 10px;
-            margin-bottom: 20px;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-        #message {
-            width: calc(100% - 22px);
-            padding: 10px;
-            margin-bottom: 10px;
-        }
-        #sendButton {
-            padding: 10px 20px;
-            background-color: #007BFF;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
-        #sendButton:hover {
-            background-color: #0056b3;
-        }
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+      }
+      #conversation {
+        border: 1px solid #ddd;
+        padding: 10px;
+        margin-bottom: 20px;
+        max-height: 300px;
+        overflow-y: auto;
+      }
+      #message {
+        width: calc(100% - 22px);
+        padding: 10px;
+        margin-bottom: 10px;
+      }
+      #sendButton {
+        padding: 10px 20px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        cursor: pointer;
+      }
+      #sendButton:hover {
+        background-color: #0056b3;
+      }
+      /* Pop-up style */
+      .popup {
+        display: none;
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        border: 1px solid #ddd;
+        padding: 20px;
+        background-color: white;
+        box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+        z-index: 1000;
+      }
+      .popup button {
+        margin-top: 10px;
+        padding: 10px 20px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        cursor: pointer;
+      }
+      .popup button:hover {
+        background-color: #0056b3;
+      }
+      #menuImage {
+        display: none;
+        width: 100%;
+        max-width: 400px;
+        margin-top: 20px;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <h1>Language Learning App</h1>
     <div id="conversation"></div>
-    <input type="text" id="message" placeholder="Type your message here...">
+    <div id="documentInfo"></div>
+    <input type="text" id="message" placeholder="Type your message here..." />
     <button id="sendButton">Send</button>
 
+    <!-- Pop-up HTML -->
+    <div id="popup" class="popup">
+      <p>
+        It didn't make sense. Please talk about something related to the
+        restaurant.
+      </p>
+      <button onclick="closePopup()">Close</button>
+    </div>
+
+    <!-- Menu Image -->
+    <img id="menuImage" src="/static/menu.png" alt="Restaurant Menu" />
+
     <script>
-        document.getElementById('sendButton').addEventListener('click', function() {
-            const message = document.getElementById('message').value;
-            if (message.trim() === '') return;
-            document.getElementById('message').value = '';
+      document
+        .getElementById("sendButton")
+        .addEventListener("click", function () {
+          const message = document.getElementById("message").value;
+          if (message.trim() === "") return;
+          document.getElementById("message").value = "";
 
-            const conversationDiv = document.getElementById('conversation');
-            const userMessageDiv = document.createElement('div');
-            userMessageDiv.textContent = 'You: ' + message;
-            conversationDiv.appendChild(userMessageDiv);
+          const conversationDiv = document.getElementById("conversation");
+          const userMessageDiv = document.createElement("div");
+          userMessageDiv.textContent = "You: " + message;
+          conversationDiv.appendChild(userMessageDiv);
 
-            fetch('/conversation', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ question: message })
-            })
-            .then(response => response.json())
-            .then(data => {
-                const aiMessageDiv = document.createElement('div');
-                aiMessageDiv.textContent = 'Gemini: ' + data.response;
+          fetch("/conversation", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ question: message }),
+          })
+            .then((response) => response.json())
+            .then((data) => {
+              if (data.unrelated) {
+                showPopup();
+              } else {
+                const aiMessageDiv = document.createElement("div");
+                aiMessageDiv.textContent = "Gemini: " + data.response;
                 conversationDiv.appendChild(aiMessageDiv);
-                conversationDiv.scrollTop = conversationDiv.scrollHeight;
+              }
+              conversationDiv.scrollTop = conversationDiv.scrollHeight;
+
+              // Display retrieved document information
+              const documentInfoDiv = document.getElementById("documentInfo");
+              documentInfoDiv.textContent =
+                "Document Information: " + data.retrieved_info;
+
+              // Handle actions
+              if (data.action === "show_menu") {
+                document.getElementById("menuImage").style.display = "block";
+              } else {
+                document.getElementById("menuImage").style.display = "none";
+              }
             })
-            .catch(error => console.error('Error:', error));
+            .catch((error) => console.error("Error:", error));
         });
+
+      function showPopup() {
+        document.getElementById("popup").style.display = "block";
+      }
+
+      function closePopup() {
+        document.getElementById("popup").style.display = "none";
+      }
     </script>
-</body>
+  </body>
 </html>
