@@ -38,23 +38,40 @@ for doc in documents:
 
 # Define available actions
 actions = {
-    "show_menu": "Display the menu image."
+    "show_menu": "Display the menu image.",
+    "next_objective": "Move to the next objective."
 }
+
+# Define the objectives for the guided conversation
+objectives = [
+    "Ask for a menu",
+    "Pick an order",
+    "Call for the waiter to pay for the meal"
+]
+current_objective_index = 0
+phoenix_triggered = False
 
 # Define your custom prompt template
 prompt_template = PromptTemplate(
-    input_variables=["history", "retrieved_info", "question", "actions"],
+    input_variables=["history", "retrieved_info", "question", "actions", "current_objective", "objectives"],
     template="""
+    You are playing the role of a waiter in a Mexican restaurant. You can only speak Spanish and cannot speak English under any circumstances.
+    The user is going through the following objectives in this order:
+    {objectives}
+
+    The current objective is: {current_objective}
+    
+    Here is the information about the restaurant: {retrieved_info}
+    
+    This is the conversation so far:
     {history}
-    Information about the restaurant: {retrieved_info}
-    Actions you can take: {actions}
-    In this chat, you are a waiter in a Mexican restaurant. You can only speak Spanish and under no circumstances can you speak English.
-    If the customer talks about something unrelated to a restaurant conversation, respond with "No entiendo, por favor hable de algo relacionado con el restaurante."
+
     Customer: {question}
-    If you want to perform an action, include it in the response in this format: [ACTION: action_name].
+
+    Available actions you can take at the end of your response are: {actions}
+    Make sure to not give them a menu unless they ask for it.
     """
 )
-
 
 # Function to load conversation history from a file
 def load_history(file_path):
@@ -86,50 +103,77 @@ async def read_index():
 # Request model for input
 class ConversationInput(BaseModel):
     question: str
+    initial: bool = False
 
 @app.post("/conversation")
 async def conversation(input: ConversationInput):
-    global history
+    global history, current_objective_index, phoenix_triggered
     question = input.question
-    
+
+    if input.initial:
+        # Return initial setup data without generating a response
+        return {"response": "", "unrelated": False, "retrieved_info": "", "action": "", "phoenix_input": "", "objectives": objectives, "current_objective_index": current_objective_index}
+
     if question.strip() == '\\end':
-        return {"response": "Goodbye!", "unrelated": False, "retrieved_info": "", "action": ""}
+        return {"response": "Goodbye!", "unrelated": False, "retrieved_info": "", "action": "", "objectives": objectives, "current_objective_index": current_objective_index}
 
     # Retrieve relevant information
     results = collection.query(query_texts=[question], n_results=1)
     if results['documents']:
         retrieved_info = results['documents'][0]
+        restaurant_name = retrieved_info[0].split("\n")[0].split(": ")[1]  # Extract restaurant name
     else:
         retrieved_info = "No relevant information found."
+        restaurant_name = "Restaurant"
 
-    # Create the full prompt with history, retrieved information, actions, and current question
+    # Determine Phoenix's input based on the current objective
+    phoenix_input = ""
+    if not phoenix_triggered:
+        if current_objective_index == 0:
+            phoenix_input = f"You walk into the busy restaurant and see a waiter smiling at you."
+            phoenix_triggered = True
+        elif current_objective_index == 1:
+            phoenix_input = "The waiter hands you the menu."
+            phoenix_triggered = True
+            current_objective_index += 1
+        elif current_objective_index == 2:
+            phoenix_input = "The waiter nods and hands you your meal. You eat quickly. The waiter seems busy, so you'll need to get his attention."
+            phoenix_triggered = True
+            current_objective_index += 1
+        elif current_objective_index == 3:
+            phoenix_input = "The waiter brings the bill and you pay for your meal. Thank you for dining with us!"
+            phoenix_triggered = True
+            current_objective_index += 1
+
+    # Create the full prompt with history, retrieved information, actions, current objective, and current question
     prompt = prompt_template.format(
         history=history, 
         retrieved_info=retrieved_info, 
         question=question, 
-        actions=json.dumps(actions)
+        actions=json.dumps(actions), 
+        current_objective=objectives[current_objective_index],
+        objectives=", ".join(objectives)
     )
     
     # Get the response from the model
-    response = llm.invoke(prompt).content
+    response = llm.invoke(prompt)
     
-    unrelated_input = "No entiendo, por favor hable de algo relacionado con el restaurante." in response
-    
+    unrelated_input = "No entiendo, por favor hable de algo relacionado con el restaurante." in response.content
     action = ""
-    if "[ACTION:" in response:
-        action_start = response.find("[ACTION:") + len("[ACTION:")
-        action_end = response.find("]", action_start)
-        action = response[action_start:action_end].strip()
-        response = response[:action_start - len("[ACTION:")].strip()  # Remove action indication from response
-    
+    if "show_menu" in response.content:
+        action = "show_menu"
+    if "next_objective" in response.content:
+        current_objective_index += 1
+        phoenix_triggered = False
+
     if unrelated_input:
-        return {"response": "", "unrelated": True, "retrieved_info": retrieved_info, "action": action}
+        return {"response": "", "unrelated": True, "retrieved_info": retrieved_info, "action": action, "phoenix_input": phoenix_input, "objectives": objectives, "current_objective_index": current_objective_index}
 
     # Update history
-    history += f"Customer: {question}\nWaiter: {response}\n"
+    history += f"Customer: {question}\nWaiter: {response.content}\n"
     save_history(history_file, history)
     
-    return {"response": response, "unrelated": False, "retrieved_info": retrieved_info, "action": action}
+    return {"response": response.content, "unrelated": False, "retrieved_info": retrieved_info, "action": action, "phoenix_input": phoenix_input, "objectives": objectives, "current_objective_index": current_objective_index}
 
 
 if __name__ == "__main__":

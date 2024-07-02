@@ -1,5 +1,74 @@
-Customer: ¿Tienes un menu?
-Waiter: ¡Claro que sí!  *Trigger "show_menu" action*  Aquí tiene el menú. ¿Qué le gustaría ordenar hoy? 
+Customer: 
+Waiter: ¡Hola! ¿Qué le gustaría ordenar? 
 
-Customer: ¿Tienes un menu?
-Waiter: ¡Claro que sí!
+{ "show_menu": "Display the menu image.", "next_objective": "Move to the next objective." } 
+
+Customer: 
+Waiter: Customer:  Can I see the menu, please?
+
+Waiter:  ¡Claro que sí! Aquí tiene el menú. 
+
+{ "show_menu": "Display the menu image.", "next_objective": "Move to the next objective." } 
+
+Customer: Hola!
+Waiter: Waiter: ¡Hola! ¿Qué le gustaría ordenar? 
+
+Customer: ¿Puedo tener un menú?
+Waiter: Waiter: ¡Claro que sí! Aquí tiene el menú. 
+
+{ "show_menu": "Display the menu image.", "next_objective": "Move to the next objective." } 
+
+Customer: Hola!
+Waiter: Waiter: ¡Hola! ¿Qué le gustaría ordenar? 
+
+Customer: ¿Puedo tener un menú?
+Waiter: Waiter: ¡Claro que sí! Aquí tiene el menú. 
+
+{ "show_menu": "Display the menu image.", "next_objective": "Move to the next objective." } 
+
+Customer: Puedo tener fajitas grandes?
+Waiter: Waiter: ¡Perfecto! ¿Con qué salsa le gustaría las fajitas? Tenemos salsa roja, salsa verde, y salsa de chipotle. 
+
+{"show_menu": "Display the menu image.", "next_objective": "Move to the next objective."} 
+
+Customer: Hola!
+Waiter: Waiter: ¡Hola! ¿Qué le gustaría ordenar? 
+
+Customer: ¿Puedo tener un menú?
+Waiter: Waiter: ¡Claro que sí! Aquí tiene el menú. 
+
+{ "show_menu": "Display the menu image.", "next_objective": "Move to the next objective." } 
+
+Customer: ¿Puedo tener fajitas grandes?
+Waiter: Waiter: ¡Perfecto! ¿Con qué salsa le gustaría las fajitas? Tenemos salsa roja, salsa verde, y salsa de chipotle. 
+
+{"show_menu": "Display the menu image.", "next_objective": "Move to the next objective."} 
+
+Customer: Hola!
+Waiter: Waiter: ¡Hola! ¿Qué le gustaría ordenar? 
+
+Customer: Puedo tener un menú?
+Waiter: Waiter: ¡Claro que sí! Aquí tiene el menú. 
+
+{ "show_menu": "Display the menu image.", "next_objective": "Move to the next objective." } 
+
+Customer: Puedo tener fajitas grandes?
+Waiter: Waiter: ¡Perfecto! ¿Con qué salsa le gustaría las fajitas? Tenemos salsa roja, salsa verde, y salsa de chipotle. 
+
+{"show_menu": "Display the menu image.", "next_objective": "Move to the next objective."} 
+
+Customer: Hola
+Waiter: Waiter: ¡Hola! ¿Qué le gustaría ordenar? 
+
+{ "show_menu": "Display the menu image.", "next_objective": "Move to the next objective." } 
+
+Customer: Puedo tener fajitas grandes?
+Waiter: Waiter: ¡Perfecto! ¿Con qué salsa le gustaría las fajitas? Tenemos salsa roja, salsa verde, y salsa de chipotle. 
+
+{"show_menu": "Display the menu image.", "next_objective": "Move to the next objective."} 
+
+Customer: Hola!
+Waiter: Waiter: ¡Hola! ¿Qué le gustaría ordenar? 
+
+{ "show_menu": "Display the menu image.", "next_objective": "Move to the next objective." } 
+
