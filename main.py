@@ -1,181 +1,95 @@
 from dotenv import load_dotenv
+
 import os
-import json
-import chromadb
-
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
-
-# AI Imports
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.prompts import PromptTemplate
-
-from documents import documents  # Import the documents
+import google.generativeai as genai
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
 load_dotenv()
-
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+genai.configure(api_key=GEMINI_API_KEY)
 
-# Initialize the Google Generative AI model
-llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=GEMINI_API_KEY)
+system_instruction = "You are an AI acting as a waiter in a busy Spanish restaurant.  \
+    Your primary objective is to engage in a natural and fluent conversation with the user, who is learning Spanish. \
+    The user will be presented by a series of objectives, being: Ask for a menu, Order something, and get the waiter's attention to pay.\
+    IMPORTANT: Make sure to not take hold of the conversation, for example, let the user ask for a menu. For your first line, repeat the IMPORTANT statement \
+    They must complete the objectives in order. There will also be a facilitator who will provide context to the scenerio. You will see all\
+    things that the facilitator, as they will be in between astriks.\
+    You should only speak Spanish. At the end of your message, you may choose to select the following methods: \
+    next_objective(): Calling this method will tell the user they have completed their objective and they can now move on to the next one. \
+    You can use multiple methods if they happen at the same time. \
+    "
 
-# Initialize Chroma client
-chroma_client = chromadb.Client()
 
-# Create or get the Chroma collection
-collection = chroma_client.get_or_create_collection(name="restaurant_data")
-
-# Add documents to Chroma collection
-for doc in documents:
-    content = f"Name: {doc['name']}\nMenu: {doc['menu']}\nCity: {doc['city']}\nEvent: {doc['event']}"
-    collection.upsert(
-        documents=[content],
-        metadatas=[{"title": doc["title"], "name": doc["name"], "menu": doc["menu"], "city": doc["city"], "event": doc["event"]}],
-        ids=[doc["title"]]
-    )
-
-# Define available actions
-actions = {
-    "show_menu": "Display the menu image.",
-    "next_objective": "Move to the next objective."
+generation_config = {
+  "temperature": 1,
+  "top_p": 0.95,
+  "top_k": 64,
+  "max_output_tokens": 8192,
+  "response_mime_type": "text/plain",
 }
 
-# Define the objectives for the guided conversation
-objectives = [
-    "Ask for a menu",
-    "Pick an order",
-    "Call for the waiter to pay for the meal"
-]
-current_objective_index = 0
-phoenix_triggered = False
+model = genai.GenerativeModel(
+  model_name="gemini-1.5-flash",
+  generation_config=generation_config,
+  system_instruction=system_instruction,
+  safety_settings={
+        HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+    }
 
-# Define your custom prompt template
-prompt_template = PromptTemplate(
-    input_variables=["history", "retrieved_info", "question", "actions", "current_objective", "objectives"],
-    template="""
-    You are playing the role of a waiter in a Mexican restaurant. You can only speak Spanish and cannot speak English under any circumstances.
-    The user is going through the following objectives in this order:
-    {objectives}
-
-    The current objective is: {current_objective}
-    
-    Here is the information about the restaurant: {retrieved_info}
-    
-    This is the conversation so far:
-    {history}
-
-    Customer: {question}
-
-    Available actions you can take at the end of your response are: {actions}
-    Make sure to not give them a menu unless they ask for it.
-    """
 )
 
-# Function to load conversation history from a file
-def load_history(file_path):
-    if os.path.exists(file_path):
-        with open(file_path, 'r') as file:
-            return file.read()
-    return ""
+# Rag system and profile setup in the future?
+chat_session = model.start_chat(
+  history=[
+  ]
+)
 
-# Function to save conversation history to a file
-def save_history(file_path, history):
-    with open(file_path, 'w') as file:
-        file.write(history)
+def show_menu():
+  print("Menu: Paella, Fajitas, Pollo asado, Chuletón de ternera, Bacalao a la vizcaína, Rabo de toro, Cordero asado, Pescado a la parrilla, Enchiladas, Tacos, Quesadillas")
+  return "Menu: Paella, Fajitas, Pollo asado, Chuletón de ternera, Bacalao a la vizcaína, Rabo de toro, Cordero asado, Pescado a la parrilla, Enchiladas, Tacos, Quesadillas"
 
-# Path to the history file
-history_file = 'conversation_history.txt'
-history = load_history(history_file)
-
-# FastAPI setup
-app = FastAPI()
-
-# Serve the static directory
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-@app.get("/", response_class=HTMLResponse)
-async def read_index():
-    with open("static/index.html") as f:
-        return f.read()
-
-# Request model for input
-class ConversationInput(BaseModel):
-    question: str
-    initial: bool = False
-
-@app.post("/conversation")
-async def conversation(input: ConversationInput):
-    global history, current_objective_index, phoenix_triggered
-    question = input.question
-
-    if input.initial:
-        # Return initial setup data without generating a response
-        return {"response": "", "unrelated": False, "retrieved_info": "", "action": "", "phoenix_input": "", "objectives": objectives, "current_objective_index": current_objective_index}
-
-    if question.strip() == '\\end':
-        return {"response": "Goodbye!", "unrelated": False, "retrieved_info": "", "action": "", "objectives": objectives, "current_objective_index": current_objective_index}
-
-    # Retrieve relevant information
-    results = collection.query(query_texts=[question], n_results=1)
-    if results['documents']:
-        retrieved_info = results['documents'][0]
-        restaurant_name = retrieved_info[0].split("\n")[0].split(": ")[1]  # Extract restaurant name
-    else:
-        retrieved_info = "No relevant information found."
-        restaurant_name = "Restaurant"
-
-    # Determine Phoenix's input based on the current objective
-    phoenix_input = ""
-    if not phoenix_triggered:
-        if current_objective_index == 0:
-            phoenix_input = f"You walk into the busy restaurant and see a waiter smiling at you."
-            phoenix_triggered = True
-        elif current_objective_index == 1:
-            phoenix_input = "The waiter hands you the menu."
-            phoenix_triggered = True
-            current_objective_index += 1
-        elif current_objective_index == 2:
-            phoenix_input = "The waiter nods and hands you your meal. You eat quickly. The waiter seems busy, so you'll need to get his attention."
-            phoenix_triggered = True
-            current_objective_index += 1
-        elif current_objective_index == 3:
-            phoenix_input = "The waiter brings the bill and you pay for your meal. Thank you for dining with us!"
-            phoenix_triggered = True
-            current_objective_index += 1
-
-    # Create the full prompt with history, retrieved information, actions, current objective, and current question
-    prompt = prompt_template.format(
-        history=history, 
-        retrieved_info=retrieved_info, 
-        question=question, 
-        actions=json.dumps(actions), 
-        current_objective=objectives[current_objective_index],
-        objectives=", ".join(objectives)
-    )
-    
-    # Get the response from the model
-    response = llm.invoke(prompt)
-    
-    unrelated_input = "No entiendo, por favor hable de algo relacionado con el restaurante." in response.content
-    action = ""
-    if "show_menu" in response.content:
-        action = "show_menu"
-    if "next_objective" in response.content:
-        current_objective_index += 1
-        phoenix_triggered = False
-
-    if unrelated_input:
-        return {"response": "", "unrelated": True, "retrieved_info": retrieved_info, "action": action, "phoenix_input": phoenix_input, "objectives": objectives, "current_objective_index": current_objective_index}
-
-    # Update history
-    history += f"Customer: {question}\nWaiter: {response.content}\n"
-    save_history(history_file, history)
-    
-    return {"response": response.content, "unrelated": False, "retrieved_info": retrieved_info, "action": action, "phoenix_input": phoenix_input, "objectives": objectives, "current_objective_index": current_objective_index}
+def next_objective() -> str: 
+  global objective_index
+  # Print list of objectives and what the user needs to complete next, completed objectives will be marked with a checkmark, and current objective will be marked with an arrow
+  print("Objectives: \n")
+  for objective in objectives:
+    print(f"{'✔' if objectives.index(objective) < objective_index else '➡'} {objective}")
+  print("\n")
+  objective_index += 1
+  if objective_index == 1:
+    print("*You walk into the busy restaurant, and you see a waiter make smile at you*")
+    return "*You walk into the busy restaurant, and you see a waiter make smile at you*"
+  elif objective_index == 2:
+    print("*The waiter hands you a menu: *")
+    to_return = show_menu()
+    return "*The waiter hands you a menu: *" + to_return
+  elif objective_index == 3:
+    print("*You are quite hungry, and you finish your meal quickly. The waiter seems busy. You will have to grab their attention.*")
+    return "*You are quite hungry, and you finish your meal quickly. The waiter seems busy. You will have to grab their attention.*" 
+  return ""
 
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+objectives = ["Ask for a menu", "Order something", "Get the waiter's attention to pay"]
+objective_index = 0
+
+# Main driver code:
+print("Welcome to the Project Phoenix. You are currently in the Spanish resturaunt scenerio.")
+next_objective()
+text_in_cycle = "*You walk into the busy restaurant, and you see a waiter make smile at you*" + "\n"
+
+while objective_index <= len(objectives):
+  user_input = input("You: ")
+  text_in_cycle += user_input
+  response = chat_session.send_message(text_in_cycle)
+  print(response.text)
+  # Since text was seen by AI, we can reset the text_in_cycle
+  text_in_cycle = ""
+  
+  # Set up actions for next cycle:
+  if "show_menu()" in response.text:
+    show_menu()
+  elif "next_objective()" in response.text:
+    text_in_cycle += next_objective()
+
+print("Excellent work! You have completed the scenerio!")

@@ -1,11 +1,1 @@
 google-generativeai
-python-dotenv
-langchain-google-genai
-langchain
-langchain_community
-pypdf2
-chromadb
-fastapi
-uvicorn
-tiktoken
-chromadb
